@@ -17,20 +17,29 @@ object GenericFunctionExercises {
   case class Pair[A](first: A, second: A) {
     // 1a. Implement `swap` which exchanges `first` and `second`
     // such as Pair("John", "Doe").swap == Pair("Doe", "John")
-    def swap: Pair[A] =
-      ???
+    def swap: Pair[A] = {
+      Pair[A](second,first)
+      //new Pair(this.second,this.first)
+    }
 
     // 1b. Implement `map` which applies a function to `first` and `second`
     // such as Pair("John", "Doe").map(_.length) == Pair(4,3)
-    def map[To](update: A => To): Pair[To] =
-      ???
+    def map[To](update: A => To): Pair[To] = {
+      Pair[To]( update(first), update(second) )
+    }
 
     // 1c. Implement `zipWith` which merges two Pairs using a `combine` function
     // such as Pair(0, 2).zipWith(Pair(3, 4))((x, y) => x + y) == Pair(3, 6)
     //         Pair(2, 3).zipWith(Pair("Hello ", "World "))(replicate) == Pair("Hello Hello ", "World World World ")
     // Bonus: Why did we separate the arguments of `zipWith` into two set of parentheses?
-    def zipWith[Other, To](other: Pair[Other])(combine: (A, Other) => To): Pair[To] =
-      ???
+    def zipWith[Other, To](other: Pair[Other])(combine: (A, Other) => To): Pair[To] = {
+      Pair[To]( combine(this.first, other.first), combine(this.second, other.second) )
+    }
+
+    def zipWithBonus[Other, Other2, To](other: Pair[Other], other2: Pair[Other2])(combine: (A, Other, Other2) => To) : Pair[To] = {
+      Pair[To]( combine(this.first, other.first, other2.first), combine(this.second,other.second,other2.second) )
+    }
+
   }
 
   // 1d. Use the Pair API to decode the content of `secret`.
@@ -39,10 +48,19 @@ object GenericFunctionExercises {
   // Note: You can remove the lazy keyword from `decoded` once you have implemented it.
   val secret: Pair[List[Byte]] =
     Pair(
-      first = List(103, 110, 105, 109, 109, 97, 114, 103, 111, 114, 80),
+      first =  List(103, 110, 105, 109, 109, 97, 114, 103, 111, 114, 80),
       second = List(108, 97, 110, 111, 105, 116, 99, 110, 117, 70)
     )
-  lazy val decoded: Pair[String] = ???
+
+  def decode( list: List[Byte] ) : String = {
+    val chars = list.map( _.toChar )
+    return chars.mkString
+  }
+  lazy val decoded: Pair[String] = {
+    secret.map(
+      ( list: List[Byte] ) => {  decode(list.reverse) }
+    ).swap
+  }
 
   // 1e. Use the Pair API to combine `productNames` and `productPrices` into `products`
   // such as products == Pair(Product("Coffee", 2.5), Product("Plane ticket", 329.99))
@@ -51,8 +69,10 @@ object GenericFunctionExercises {
   val productNames: Pair[String]  = Pair("Coffee", "Plane ticket")
   val productPrices: Pair[Double] = Pair(2.5, 329.99)
 
-  lazy val products: Pair[Product] =
-    ???
+  lazy val products: Pair[Product] = {
+    productNames.zipWith(productPrices)( ( name: String, price: Double ) => { Product(name = name, price = price) } )
+    // productNames.zipWith(productPrices)(Product) - Also works
+  }
 
   //////////////////////////////////////////////
   // Bonus question (not covered by the video)
@@ -74,7 +94,14 @@ object GenericFunctionExercises {
 
   lazy val isOddPositive: Predicate[Int] =
     isEven.flip && isPositive
+    //isEven.flip.&&(isPositive)
+    // this is the infix operator syntax, and it works becasue
+    // the && functon takes one argument
 
+
+
+  // Case class of predicates:
+  // Contains a single attribute eval, whcih  is a fnction that 
   case class Predicate[A](eval: A => Boolean) {
     // DSL to call a predicate like a function
     // isPositive(10) instead of isPositive.eval(10)
@@ -85,21 +112,25 @@ object GenericFunctionExercises {
     // but     (isEven && isPositive)(11) == false
     //         (isEven && isPositive)(-4) == false
     //         (isEven && isPositive)(-7) == false
-    def &&(other: Predicate[A]): Predicate[A] =
-      ???
+    def &&(other: Predicate[A]): Predicate[A] = {
+      Predicate( value => { this.eval(value) && other.eval(value) } )
+    }
 
     // 2b. Implement `||` that combines two predicates using logical or
     // such as (isEven || isPositive)(12) == true
     //         (isEven || isPositive)(11) == true
     //         (isEven || isPositive)(-4) == true
     // but     (isEven || isPositive)(-7) == false
-    def ||(other: Predicate[A]): Predicate[A] =
-      ???
+    def ||(other: Predicate[A]): Predicate[A] = {
+      Predicate( ( value: A ) => { this.eval(value) || other.eval(value) } )
+    }
 
     // 2c. Implement `flip` that reverses a predicate
     // such as isEven.flip(11) == true
-    def flip: Predicate[A] =
-      ???
+    def flip: Predicate[A] = {
+      Predicate( (value: A) => { ! this.eval(value) }  )
+    }
+      
   }
 
   // 2d. Implement `isValidUser`, a predicate which checks if a `User` is:
@@ -114,8 +145,35 @@ object GenericFunctionExercises {
   // You may want to create new Predicate methods to improve the implementation of `isValidUser`.
   case class User(name: String, age: Int)
 
-  lazy val isValidUser: Predicate[User] =
-    ???
+  def greaterThan(test: Int): Predicate[Int] = {
+    Predicate( (value: Int) => { value >= test } )
+  }
+
+  val isAdult: Predicate[User] = {
+    foo(greaterThan(18))( (user: User) => {user.age} )
+  }
+
+  val isValidUsername: Predicate[User] = {
+    foo(greaterThan(3))( _.name.length )
+  }
+
+  def foo( in: Predicate[Int])(transform : User => Int ) : Predicate[User] = { 
+    Predicate( user => { in.eval( transform(user) ) })
+  }
+
+  lazy val capatilized: Predicate[String] = {
+    Predicate( ( string: String) => { string.charAt(0).isUpper } )
+  }
+
+  def minLength(length: Int): Predicate[String] = {
+    Predicate( ( string: String) => { string.length >= length} )
+  }
+
+  lazy val isValidUser: Predicate[User] = {
+    val userName = ( minLength(3) && capatilized  )
+    val userAge = isAdult 
+    Predicate( ( user: User) => { userName(user.name) && isAdult(user)  } )
+  }
 
   ////////////////////////////
   // Exercise 3: JsonDecoder
@@ -124,8 +182,18 @@ object GenericFunctionExercises {
   // very basic representation of JSON
   type Json = String
 
+  //JsonDecoder is a SAM type - it only has one method
   trait JsonDecoder[A] {
     def decode(json: Json): A
+
+    def map[To](decoder: JsonDecoder[A])(update: A => To): JsonDecoder[To] = {
+      new JsonDecoder[To] {
+        def decode( json: Json ): To = {
+          val stage1 = decoder.decode(json)
+          update(stage1)
+        }
+      }
+    }
   }
 
   val intDecoder: JsonDecoder[Int] = new JsonDecoder[Int] {
@@ -148,8 +216,11 @@ object GenericFunctionExercises {
   // such as userIdDecoder.decode("1234") == UserId(1234)
   // but     userIdDecoder.decode("hello") would throw an Exception
   case class UserId(value: Int)
-  lazy val userIdDecoder: JsonDecoder[UserId] =
-    ???
+  lazy val userIdDecoder: JsonDecoder[UserId] = new JsonDecoder[UserId] {
+    def decode(input: Json): UserId = {
+      new UserId( value = input.toInt )
+    }
+  }
 
   // 3b. Implement `localDateDecoder`, a `JsonDecoder` for `LocalDate`
   // such as localDateDecoder.decode("\"2020-03-26\"") == LocalDate.of(2020,3,26)
@@ -157,14 +228,27 @@ object GenericFunctionExercises {
   // and     localDateDecoder.decode("hello") would throw an Exception
   // Note: You can parse a `LocalDate` using `LocalDate.parse` with a java.time.format.DateTimeFormatter
   // e.g. DateTimeFormatter.ISO_LOCAL_DATE
-  lazy val localDateDecoder: JsonDecoder[LocalDate] =
-    ???
+  lazy val localDateDecoder: JsonDecoder[LocalDate] = (inputWithQuotes: Json) => {
+    //val string = stringDecoder.decode(inputWithQuotes)
+    //LocalDate.parse(string,DateTimeFormatter.ISO_LOCAL_DATE)
+    stringDecoder.map[LocalDate]( LocalDate.parse(_, DateTimeFormatter.ISO_LOCAL_DATE) )
+    //map[String,LocalDate](stringDecoder)( ( string: String ) => { LocalDate.parse(string,DateTimeFormatter.ISO_LOCAL_DATE) } ).decode(inputWithQuotes)
+  }
+
 
   // 3c. Implement `map` a generic function that converts a `JsonDecoder` of `From`
   // into a `JsonDecoder` of `To`.
   // Bonus: Can you re-implement `userIdDecoder` and `localDateDecoder` using `map`
-  def map[From, To](decoder: JsonDecoder[From])(update: From => To): JsonDecoder[To] =
-    ???
+  /*
+  def map[From, To](decoder: JsonDecoder[From])(update: From => To): JsonDecoder[To] = {
+    new JsonDecoder[To] {
+      def decode( json: Json ): To = {
+        val stage1 = decoder.decode(json)
+        update(stage1)
+      }
+    }
+  }
+  */
 
   // 3d. Move `map` inside of `JsonDecoder` trait so that we can use the syntax
   // `intDecoder.map(_ + 1)` instead of `map(intDecoder)(_ + 1)`
